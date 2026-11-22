@@ -5,125 +5,135 @@
 <h1 align="center">Dictate</h1>
 
 <p align="center">
-  <b>Hold Fn, talk, let go. Your words appear wherever you're typing.</b><br>
-  Private, offline voice-to-text for macOS — no account, no subscription, no word limits.
+  Hold Fn, talk, and let go. Your words show up wherever you're typing.
 </p>
 
 <p align="center">
-  <a href="https://github.com/Wave-Drop-Maps/dictate/actions/workflows/build.yml"><img src="https://github.com/Wave-Drop-Maps/dictate/actions/workflows/build.yml/badge.svg" alt="Build"></a>
-  <img src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple" alt="macOS 14+">
+  <a href="https://github.com/Wave-Drop-Maps/Dictate/actions/workflows/build.yml"><img src="https://github.com/Wave-Drop-Maps/Dictate/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
+  <img src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple" alt="macOS 14 or later">
   <img src="https://img.shields.io/badge/Apple%20Silicon-M1%2B-black" alt="Apple Silicon">
   <img src="https://img.shields.io/badge/Swift-5.10-F05138?logo=swift&logoColor=white" alt="Swift 5.10">
-  <img src="https://img.shields.io/badge/100%25-offline-2ea44f" alt="100% offline">
+  <img src="https://img.shields.io/badge/works-offline-2ea44f" alt="Works offline">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
 </p>
 
 <p align="center">
-  <img src="docs/pill-recording.png" width="148" alt="Recording pill with live waveform">
+  <img src="docs/pill-recording.png" width="148" alt="The recording pill with a live waveform">
   &nbsp;&nbsp;
-  <img src="docs/notice.png" width="364" alt="No text box selected notice with Copy button">
+  <img src="docs/notice.png" width="364" alt="The notice shown when no text box is selected, with a Copy button">
 </p>
 
----
+Dictate is a free, open-source dictation app for the Mac. It runs entirely on your computer, so there's no
+account, no subscription and no word limit, and nothing you say is ever sent anywhere.
 
-## Why
+## Why Dictate?
 
-Cloud dictation apps send your voice — and often the text around your cursor — to their servers, charge monthly,
-and cap how much you can say. Dictate runs NVIDIA's **Parakeet** speech model on your Mac's **Neural Engine**
-instead. It's fast, accurate, and works with the Wi-Fi off.
+Most dictation apps send your voice to their servers to turn it into text. Many also collect the text around
+your cursor for context, charge a monthly fee, and limit how much you can say on the free plan.
 
-| | Cloud dictation apps | **Dictate** |
+Dictate does the work on your Mac instead. It uses NVIDIA's Parakeet speech model running on the Neural Engine,
+which makes it fast and accurate, and it keeps working with your Wi-Fi switched off.
+
+| | Typical cloud dictation app | Dictate |
 |---|---|---|
-| Where your voice goes | Their servers | **Nowhere — stays on your Mac** |
-| Account / subscription | Required | **None** |
-| Word limits | Weekly caps on free plans | **Unlimited** |
-| Works offline | No | **Yes** |
-| Speed (30 s of speech) | Network round trip | **~0.25 s on an M-series Mac** |
+| Where your voice goes | Their servers | Nowhere. It stays on your Mac. |
+| Account | Required | Not needed |
+| Price | Monthly subscription | Free |
+| Word limit | Weekly cap on free plans | None |
+| Works offline | No | Yes |
+| 30 seconds of speech | Depends on your connection | About a quarter of a second |
 
 ## Features
 
-- **Hold Fn to talk** — release and the text is typed into the app you're in.
-- **Double-tap Fn for hands-free** — talk as long as you like, press Fn again to finish. Esc cancels.
-- **Always on your clipboard** — every result is copied too, so ⌘V works if anything goes wrong.
-- **Knows when there's nowhere to type** — no text box selected? You get a small notice with a Copy button
-  instead of text vanishing. Works in native apps and in browsers.
-- **Smart spacing** — dictating straight after a word adds the space for you.
-- **Live feedback** — a small waveform pill at the bottom of the screen and a `Listening 0:07` timer in the menu bar.
-- **Stays out of the way** — Fn shortcuts (Fn+arrows etc.) keep working and quick stray taps are ignored.
-- **Lightweight** — about 1,600 lines of Swift, 0% CPU and ~30 MB of memory while idle.
+- **Hold Fn to talk.** Let go and the text is typed into whatever app you're using.
+- **Double-tap Fn for hands-free.** Talk for as long as you like, then press Fn once to finish. Press Esc to cancel.
+- **Every result is copied too.** If the text doesn't land where you expected, just press ⌘V.
+- **It tells you when there's nowhere to type.** If no text box is selected, you'll see a small notice with a
+  Copy button rather than your words quietly disappearing. This works in regular apps and in your browser.
+- **Smart spacing.** Dictate adds a space when you start talking straight after a word.
+- **You can always tell it's listening.** A small waveform appears at the bottom of the screen and the menu bar
+  shows a timer while you talk.
+- **It stays out of your way.** Your usual Fn shortcuts, like Fn with an arrow key, still work, and accidental
+  taps are ignored.
+- **It's lightweight.** It's about 1,600 lines of Swift, and when idle it uses no CPU and around 30 MB of memory.
 
 <p align="center">
-  <img src="docs/settings.png" width="460" alt="Dictate settings window showing status, instructions and options">
+  <img src="docs/settings.png" width="460" alt="Dictate's settings window, showing setup status, instructions and options">
 </p>
 
-## Requirements
+## What you need
 
-- macOS 14 Sonoma or later on Apple Silicon (M1 or newer)
-- Xcode Command Line Tools — `xcode-select --install`
+- A Mac with Apple Silicon (M1 or newer) running macOS 14 Sonoma or later
+- Apple's Command Line Tools, which you can install with `xcode-select --install`
 
-## Install
+## Installing
 
 ```bash
-git clone https://github.com/Wave-Drop-Maps/dictate.git
-cd dictate
+git clone https://github.com/Wave-Drop-Maps/Dictate.git
+cd Dictate
 ./build-app.sh
 ```
 
-The first build fetches [FluidAudio](https://github.com/FluidInference/FluidAudio) and takes a few minutes.
-The script installs **Dictate.app** into `/Applications`; open it from there or with Spotlight.
+The first build downloads [FluidAudio](https://github.com/FluidInference/FluidAudio), so give it a few minutes.
+When it's done, Dictate is in your Applications folder and you can open it like any other app.
 
-### First launch
+### The first time you open it
 
-1. **Speech model** — click **Download (470 MB)** in Dictate's window. This is the only time Dictate uses the
-   internet.
-2. **Microphone** — click Allow.
-3. **Accessibility** — System Settings → Privacy & Security → Accessibility → switch on **Dictate**. This is how
-   it notices the Fn key and types for you.
-4. **Fn key** — System Settings → Keyboard → set **Press 🌐 key to** → **Do Nothing**, so Fn doesn't also open
-   the emoji picker.
-5. Optional: switch on **Open Dictate when I log in**.
+1. **Download the speech model.** Click **Download (470 MB)** in Dictate's window. This is the only time
+   Dictate uses the internet.
+2. **Allow the microphone** when macOS asks.
+3. **Turn on Accessibility.** Go to System Settings → Privacy & Security → Accessibility and switch on Dictate.
+   It needs this to notice the Fn key and type for you.
+4. **Free up the Fn key.** Go to System Settings → Keyboard and set **Press 🌐 key to** to **Do Nothing**.
+   Otherwise Fn will also open the emoji picker.
+5. **Optional:** switch on **Open Dictate when I log in**.
 
-Dictate's window shows a green tick next to each of these once it's set up. Closing the window keeps Dictate
-running; quit it from the menu bar, the Dock, or ⌘Q.
+Each step gets a green tick in Dictate's window once it's done. Closing the window doesn't quit the app, so Fn
+keeps working. To quit, use the menu bar icon, the Dock, or ⌘Q.
 
 ## Privacy
 
-- No network access after the one-time model download. No analytics, no crash reporting, no account.
-- Audio is held in memory only while you're dictating, then discarded.
-- Transcripts are never written to disk. The "Recent" list in Settings lives in memory and is gone when you quit.
-- To decide whether to paste, Dictate asks macOS what *kind* of control has focus (text box, list, button) — never
-  its contents. The only text it reads is the one character before your cursor, for smart spacing.
-- The optional diagnostic log (off by default) records key events and state changes, never audio or text.
+- After the one-time model download, Dictate never connects to the internet. There are no analytics, no crash
+  reports and no account.
+- Your audio is kept in memory only while you're talking, then thrown away.
+- Transcripts are never saved to disk. The Recent list in Settings is cleared when you quit.
+- To decide whether it can paste, Dictate asks macOS what kind of control is selected, such as a text box, a list
+  or a button. It never reads what's inside. The only text it looks at is the single character before your
+  cursor, so it knows whether to add a space.
+- There's an optional diagnostic log, which is off by default. It records key presses and app states, never
+  audio or text.
 
 ## How it works
 
-| Piece | File |
+The code is split into a handful of small files:
+
+| What it does | File |
 |---|---|
-| Fn key state machine and delivering text | [`AppController.swift`](Sources/Dictate/AppController.swift) |
-| Microphone → 16 kHz mono | [`Recorder.swift`](Sources/Dictate/Recorder.swift) |
-| Speech-to-text with Parakeet via FluidAudio | [`Transcriber.swift`](Sources/Dictate/Transcriber.swift) |
-| Text-box detection, smart spacing, paste | [`TextInsertion.swift`](Sources/Dictate/TextInsertion.swift) |
-| Waveform pill and notices | [`Overlay.swift`](Sources/Dictate/Overlay.swift) |
-| Menu bar status | [`MenuBarIndicator.swift`](Sources/Dictate/MenuBarIndicator.swift) |
+| Handles the Fn key and delivers the text | [`AppController.swift`](Sources/Dictate/AppController.swift) |
+| Records from the microphone | [`Recorder.swift`](Sources/Dictate/Recorder.swift) |
+| Turns speech into text with Parakeet | [`Transcriber.swift`](Sources/Dictate/Transcriber.swift) |
+| Finds the text box, adds spacing and pastes | [`TextInsertion.swift`](Sources/Dictate/TextInsertion.swift) |
+| Draws the waveform pill and notices | [`Overlay.swift`](Sources/Dictate/Overlay.swift) |
+| Shows the status in the menu bar | [`MenuBarIndicator.swift`](Sources/Dictate/MenuBarIndicator.swift) |
 | Settings window and preferences | [`Settings.swift`](Sources/Dictate/Settings.swift) |
 
-`Dictate --transcribe recording.wav` prints a transcript, which is handy for checking the model.
-The icon and sounds are generated by [`scripts/`](scripts).
+You can also run `Dictate --transcribe recording.wav` to print a transcript of an audio file, which is handy for
+testing the model. The icon and sounds are made by the scripts in [`scripts/`](scripts).
 
-## Notes
+## Good to know
 
-- **Signing.** `build-app.sh` signs ad-hoc with a fixed identifier so macOS keeps your permissions across
-  rebuilds. That suits building it yourself; a distributed binary should be signed with a Developer ID and
-  notarised.
-- **Languages.** Parakeet v3 supports 25 European languages, including English.
+- **Signing.** `build-app.sh` signs the app for your own Mac with a fixed identifier, so macOS remembers your
+  permissions when you rebuild. If you want to share a ready-made copy with other people, sign it with an Apple
+  Developer ID and notarise it.
+- **Languages.** Parakeet v3 understands 25 European languages, including English.
 
 ## Credits
 
 - Speech model: [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (CC-BY-4.0),
-  Core ML conversion by [FluidInference](https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml).
+  converted to Core ML by [FluidInference](https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml).
 - On-device inference: [FluidAudio](https://github.com/FluidInference/FluidAudio) (Apache-2.0).
-- The icon and interface sounds are original to this project.
+- The icon and sounds were made for this project.
 
 ## License
 
-[MIT](LICENSE)
+Dictate is released under the [MIT License](LICENSE).

@@ -1,0 +1,10 @@
+# Build output
+.build/
+build/
+*.app
+
+# Local test recordings
+test/
+
+# macOS
+.DS_Store

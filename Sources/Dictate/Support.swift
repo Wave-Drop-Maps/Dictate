@@ -32,7 +32,7 @@ func debugLog(_ message: String) {
 
 // MARK: - Sounds
 
-/// Interface sounds: short, soft, low "pops" made for Dictate (Resources/*.wav, original audio).
+/// Interface sounds (Resources/*.wav): "drop_003" from Kenney's Interface Sounds, CC0.
 enum Cue: String, CaseIterable {
     case start, stop, handsfree, cancel, notice
 }

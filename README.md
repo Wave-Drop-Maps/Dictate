@@ -118,7 +118,7 @@ The code is split into a handful of small files:
 | Settings window and preferences | [`Settings.swift`](Sources/Dictate/Settings.swift) |
 
 You can also run `Dictate --transcribe recording.wav` to print a transcript of an audio file, which is handy for
-testing the model. The icon and sounds are made by the scripts in [`scripts/`](scripts).
+testing the model. The icon is drawn by [`scripts/make-icon.swift`](scripts/make-icon.swift).
 
 ## Good to know
 
@@ -132,7 +132,8 @@ testing the model. The icon and sounds are made by the scripts in [`scripts/`](s
 - Speech model: [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (CC-BY-4.0),
   converted to Core ML by [FluidInference](https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml).
 - On-device inference: [FluidAudio](https://github.com/FluidInference/FluidAudio) (Apache-2.0).
-- The icon and sounds were made for this project.
+- Sound: "drop_003" from [Kenney's Interface Sounds](https://kenney.nl/assets/interface-sounds) (CC0).
+- The icon was made for this project.
 
 ## License
 

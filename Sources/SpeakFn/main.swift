@@ -1,4 +1,4 @@
-// Dictate — private, fully local push-to-talk dictation for macOS.
+// SpeakFn — private, fully local push-to-talk dictation for macOS.
 // Entry point. `--transcribe <file>` prints a transcript (handy for checking the model).
 
 import AppKit

@@ -81,10 +81,10 @@ final class AppController: NSObject, NSApplicationDelegate {
         if !launchedAtLogin || !AXIsProcessTrusted() { settings.show() }
     }
 
-    /// Closing the window never quits — Dictate keeps listening for Fn until you choose Quit.
+    /// Closing the window never quits — SpeakFn keeps listening for Fn until you choose Quit.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
-    /// Opening Dictate again (Finder, Spotlight, Dock) shows the Settings window.
+    /// Opening SpeakFn again (Finder, Spotlight, Dock) shows the Settings window.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         settings.show()
         return true
@@ -402,18 +402,18 @@ final class AppController: NSObject, NSApplicationDelegate {
         case .loading:
             toaster.show(
                 ToastModel(
-                    symbol: "hourglass", tint: .blue, title: "Dictate is starting up",
+                    symbol: "hourglass", tint: .blue, title: "SpeakFn is starting up",
                     message: "The speech model is loading — try again in a few seconds."), seconds: 3)
         case .downloading:
             toaster.show(
                 ToastModel(
                     symbol: "arrow.down.circle", tint: .blue, title: "Downloading speech model",
-                    message: "This happens once. Dictate will be ready when it finishes."), seconds: 3)
+                    message: "This happens once. SpeakFn will be ready when it finishes."), seconds: 3)
         default:
             toaster.show(
                 ToastModel(
                     symbol: "exclamationmark.triangle.fill", tint: .orange, title: "Speech model not installed",
-                    message: "Open Dictate's settings to set it up.",
+                    message: "Open SpeakFn's settings to set it up.",
                     action: ToastAction(title: "Open") { [weak self] in self?.settings.show() }))
         }
     }
@@ -423,7 +423,7 @@ final class AppController: NSObject, NSApplicationDelegate {
             toaster.show(
                 ToastModel(
                     symbol: "mic.slash.fill", tint: .red, title: "Microphone access is off",
-                    message: "Allow Dictate to use the microphone in System Settings.",
+                    message: "Allow SpeakFn to use the microphone in System Settings.",
                     action: ToastAction(title: "Open") { openPrivacyPane("Privacy_Microphone") }))
         } else {
             toaster.show(
@@ -435,23 +435,23 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     // MARK: Menu bar
 
-    /// The app's own menu bar (shown while Dictate is the active app).
+    /// The app's own menu bar (shown while SpeakFn is the active app).
     func buildMainMenu() {
         let main = NSMenu()
 
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "About Dictate", action: #selector(showAbout), keyEquivalent: "").target = self
+        appMenu.addItem(withTitle: "About SpeakFn", action: #selector(showAbout), keyEquivalent: "").target = self
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide Dictate", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: "Hide SpeakFn", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let hideOthers = appMenu.addItem(
             withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
         hideOthers.keyEquivalentModifierMask = [.command, .option]
         appMenu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Quit Dictate", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Quit SpeakFn", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         main.addItem(appItem)
 
@@ -498,7 +498,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "Copy Last Transcript", action: #selector(copyLast), keyEquivalent: "c")
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit Dictate", action: #selector(quit), keyEquivalent: "q")
+        menu.addItem(withTitle: "Quit SpeakFn", action: #selector(quit), keyEquivalent: "q")
         for item in menu.items where item.action != nil { item.target = self }
         statusItem.menu = menu
         indicator = MenuBarIndicator(item: statusItem, meter: meter)

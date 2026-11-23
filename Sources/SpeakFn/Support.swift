@@ -11,7 +11,7 @@ let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionS
 // MARK: - Diagnostic log
 // Off by default. Records key events and state changes only — never audio or transcript text.
 
-let logURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Dictate.log")
+let logURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/SpeakFn.log")
 private let logQueue = DispatchQueue(label: "dictate.log")
 private let logFormatter = ISO8601DateFormatter()
 

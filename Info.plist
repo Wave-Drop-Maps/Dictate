@@ -3,15 +3,15 @@
 <plist version="1.0">
 <dict>
   <key>CFBundleIdentifier</key><string>local.dictate</string>
-  <key>CFBundleName</key><string>Dictate</string>
-  <key>CFBundleDisplayName</key><string>Dictate</string>
-  <key>CFBundleExecutable</key><string>Dictate</string>
+  <key>CFBundleName</key><string>SpeakFn</string>
+  <key>CFBundleDisplayName</key><string>SpeakFn</string>
+  <key>CFBundleExecutable</key><string>SpeakFn</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.10</string>
+  <key>CFBundleShortVersionString</key><string>2.0</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
-  <key>CFBundleIconFile</key><string>Dictate</string>
+  <key>CFBundleIconFile</key><string>SpeakFn</string>
   <key>NSHumanReadableCopyright</key><string>Runs entirely on this Mac.</string>
-  <key>NSMicrophoneUsageDescription</key><string>Dictate records your voice while you hold Fn and turns it into text on this Mac. Nothing leaves your computer.</string>
+  <key>NSMicrophoneUsageDescription</key><string>SpeakFn records your voice while you hold Fn and turns it into text on this Mac. Nothing leaves your computer.</string>
 </dict>
 </plist>

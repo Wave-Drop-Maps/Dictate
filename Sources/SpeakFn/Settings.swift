@@ -41,7 +41,7 @@ final class Prefs: ObservableObject {
     @Published var accessibilityAllowed = false
     /// macOS's "Press 🌐 key to" setting must be "Do Nothing", or Fn also opens the emoji picker etc.
     @Published var fnKeyFree = true
-    /// Recent transcripts — memory only, gone when Dictate quits.
+    /// Recent transcripts — memory only, gone when SpeakFn quits.
     @Published var history: [HistoryItem] = []
 
     private init() {
@@ -152,7 +152,7 @@ struct SettingsView: View {
         HStack(spacing: 14) {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 60, height: 60)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Dictate").font(.title2.weight(.bold))
+                Text("SpeakFn").font(.title2.weight(.bold))
                 Text("Private voice-to-text. Everything stays on this Mac.")
                     .font(.callout).foregroundStyle(.secondary)
             }
@@ -195,7 +195,7 @@ struct SettingsView: View {
                 ok: prefs.accessibilityAllowed, actionTitle: "Fix…",
                 action: { openPrivacyPane("Privacy_Accessibility") })
             StatusRow(
-                title: "Fn key", detail: prefs.fnKeyFree ? "Free for Dictate" : "Also used by macOS",
+                title: "Fn key", detail: prefs.fnKeyFree ? "Free for SpeakFn" : "Also used by macOS",
                 ok: prefs.fnKeyFree, actionTitle: "Fix…",
                 action: {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
@@ -210,7 +210,7 @@ struct SettingsView: View {
     private var optionsSection: some View {
         Section("Options") {
             Toggle(
-                "Open Dictate when I log in",
+                "Open SpeakFn when I log in",
                 isOn: Binding(get: { prefs.launchAtLogin }, set: { prefs.setLaunchAtLogin($0) }))
             if prefs.loginNeedsApproval {
                 HStack {
@@ -221,7 +221,7 @@ struct SettingsView: View {
             }
             Toggle("Type the text for me (off = copy to clipboard only)", isOn: $prefs.autoPaste)
             Toggle("Show the recording pill", isOn: $prefs.showPill)
-            Toggle("Show Dictate in the Dock (off = menu bar only)", isOn: $prefs.showInDock)
+            Toggle("Show SpeakFn in the Dock (off = menu bar only)", isOn: $prefs.showInDock)
             Toggle("Play sounds", isOn: $prefs.sounds)
             if prefs.sounds {
                 HStack(spacing: 10) {
@@ -262,7 +262,7 @@ struct SettingsView: View {
             Text("Version \(appVersion) · No internet · No account · Nothing saved")
                 .font(.caption).foregroundStyle(.secondary)
             Spacer()
-            Button("Quit Dictate") { NSApp.terminate(nil) }
+            Button("Quit SpeakFn") { NSApp.terminate(nil) }
         }
         .padding(.horizontal, 22).padding(.vertical, 12)
     }
@@ -286,7 +286,7 @@ private struct CopyButton: View {
     }
 }
 
-/// While the Settings window is open Dictate shows in the Dock and ⌘-Tab; otherwise it lives in the menu bar.
+/// While the Settings window is open SpeakFn shows in the Dock and ⌘-Tab; otherwise it lives in the menu bar.
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     var onDownloadModel: () -> Void = {}
@@ -296,7 +296,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             let w = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 540, height: 720),
                 styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
-            w.title = "Dictate"
+            w.title = "SpeakFn"
             w.isReleasedWhenClosed = false
             w.contentViewController = NSHostingController(
                 rootView: SettingsView(onDownloadModel: { [weak self] in self?.onDownloadModel() }))
@@ -310,7 +310,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         window?.makeKeyAndOrderFront(nil)
     }
 
-    /// Closing the window keeps Dictate running (Fn still works). Only Quit stops it.
+    /// Closing the window keeps SpeakFn running (Fn still works). Only Quit stops it.
     func windowWillClose(_ notification: Notification) {
         Prefs.shared.applyDockPolicy(windowOpen: false)
     }

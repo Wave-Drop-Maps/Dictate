@@ -41,7 +41,7 @@ final class MenuBarIndicator {
 
     private func showIdle() {
         guard let button = item.button else { return }
-        let image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Dictate")
+        let image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "SpeakFn")
         image?.isTemplate = true
         button.image = image
         button.attributedTitle = NSAttributedString(string: "")

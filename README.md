@@ -1,15 +1,15 @@
 <p align="center">
-  <img src="icon/icon-1024.png" width="128" alt="Dictate app icon">
+  <img src="icon/icon-1024.png" width="128" alt="SpeakFn app icon">
 </p>
 
-<h1 align="center">Dictate</h1>
+<h1 align="center">SpeakFn</h1>
 
 <p align="center">
   Hold Fn, talk, and let go. Your words show up wherever you're typing.
 </p>
 
 <p align="center">
-  <a href="https://github.com/Wave-Drop-Maps/Dictate/actions/workflows/build.yml"><img src="https://github.com/Wave-Drop-Maps/Dictate/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
+  <a href="https://github.com/Wave-Drop-Maps/SpeakFn/actions/workflows/build.yml"><img src="https://github.com/Wave-Drop-Maps/SpeakFn/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple" alt="macOS 14 or later">
   <img src="https://img.shields.io/badge/Apple%20Silicon-M1%2B-black" alt="Apple Silicon">
   <img src="https://img.shields.io/badge/Swift-5.10-F05138?logo=swift&logoColor=white" alt="Swift 5.10">
@@ -23,18 +23,19 @@
   <img src="docs/notice.png" width="364" alt="The notice shown when no text box is selected, with a Copy button">
 </p>
 
-Dictate is a free, open-source dictation app for the Mac. It runs entirely on your computer, so there's no
-account, no subscription and no word limit, and nothing you say is ever sent anywhere.
+SpeakFn is a free, open-source dictation app for the Mac, and an offline alternative to Wispr Flow and
+Superwhisper. It runs entirely on your computer, so there's no account, no subscription and no word limit, and
+nothing you say is ever sent anywhere.
 
-## Why Dictate?
+## Why SpeakFn?
 
 Most dictation apps send your voice to their servers to turn it into text. Many also collect the text around
 your cursor for context, charge a monthly fee, and limit how much you can say on the free plan.
 
-Dictate does the work on your Mac instead. It uses NVIDIA's Parakeet speech model running on the Neural Engine,
+SpeakFn does the work on your Mac instead. It uses NVIDIA's Parakeet speech model running on the Neural Engine,
 which makes it fast and accurate, and it keeps working with your Wi-Fi switched off.
 
-| | Typical cloud dictation app | Dictate |
+| | Typical cloud dictation app | SpeakFn |
 |---|---|---|
 | Where your voice goes | Their servers | Nowhere. It stays on your Mac. |
 | Account | Required | Not needed |
@@ -50,7 +51,7 @@ which makes it fast and accurate, and it keeps working with your Wi-Fi switched 
 - **Every result is copied too.** If the text doesn't land where you expected, just press ⌘V.
 - **It tells you when there's nowhere to type.** If no text box is selected, you'll see a small notice with a
   Copy button rather than your words quietly disappearing. This works in regular apps and in your browser.
-- **Smart spacing.** Dictate adds a space when you start talking straight after a word.
+- **Smart spacing.** SpeakFn adds a space when you start talking straight after a word.
 - **You can always tell it's listening.** A small waveform appears at the bottom of the screen and the menu bar
   shows a timer while you talk.
 - **It stays out of your way.** Your usual Fn shortcuts, like Fn with an arrow key, still work, and accidental
@@ -58,7 +59,7 @@ which makes it fast and accurate, and it keeps working with your Wi-Fi switched 
 - **It's lightweight.** It's about 1,600 lines of Swift, and when idle it uses no CPU and around 30 MB of memory.
 
 <p align="center">
-  <img src="docs/settings.png" width="460" alt="Dictate's settings window, showing setup status, instructions and options">
+  <img src="docs/settings.png" width="460" alt="SpeakFn's settings window, showing setup status, instructions and options">
 </p>
 
 ## What you need
@@ -69,35 +70,35 @@ which makes it fast and accurate, and it keeps working with your Wi-Fi switched 
 ## Installing
 
 ```bash
-git clone https://github.com/Wave-Drop-Maps/Dictate.git
-cd Dictate
+git clone https://github.com/Wave-Drop-Maps/SpeakFn.git
+cd SpeakFn
 ./build-app.sh
 ```
 
 The first build downloads [FluidAudio](https://github.com/FluidInference/FluidAudio), so give it a few minutes.
-When it's done, Dictate is in your Applications folder and you can open it like any other app.
+When it's done, SpeakFn is in your Applications folder and you can open it like any other app.
 
 ### The first time you open it
 
-1. **Download the speech model.** Click **Download (470 MB)** in Dictate's window. This is the only time
-   Dictate uses the internet.
+1. **Download the speech model.** Click **Download (470 MB)** in SpeakFn's window. This is the only time
+   SpeakFn uses the internet.
 2. **Allow the microphone** when macOS asks.
-3. **Turn on Accessibility.** Go to System Settings → Privacy & Security → Accessibility and switch on Dictate.
+3. **Turn on Accessibility.** Go to System Settings → Privacy & Security → Accessibility and switch on SpeakFn.
    It needs this to notice the Fn key and type for you.
 4. **Free up the Fn key.** Go to System Settings → Keyboard and set **Press 🌐 key to** to **Do Nothing**.
    Otherwise Fn will also open the emoji picker.
-5. **Optional:** switch on **Open Dictate when I log in**.
+5. **Optional:** switch on **Open SpeakFn when I log in**.
 
-Each step gets a green tick in Dictate's window once it's done. Closing the window doesn't quit the app, so Fn
+Each step gets a green tick in SpeakFn's window once it's done. Closing the window doesn't quit the app, so Fn
 keeps working. To quit, use the menu bar icon, the Dock, or ⌘Q.
 
 ## Privacy
 
-- After the one-time model download, Dictate never connects to the internet. There are no analytics, no crash
+- After the one-time model download, SpeakFn never connects to the internet. There are no analytics, no crash
   reports and no account.
 - Your audio is kept in memory only while you're talking, then thrown away.
 - Transcripts are never saved to disk. The Recent list in Settings is cleared when you quit.
-- To decide whether it can paste, Dictate asks macOS what kind of control is selected, such as a text box, a list
+- To decide whether it can paste, SpeakFn asks macOS what kind of control is selected, such as a text box, a list
   or a button. It never reads what's inside. The only text it looks at is the single character before your
   cursor, so it knows whether to add a space.
 - There's an optional diagnostic log, which is off by default. It records key presses and app states, never
@@ -109,15 +110,15 @@ The code is split into a handful of small files:
 
 | What it does | File |
 |---|---|
-| Handles the Fn key and delivers the text | [`AppController.swift`](Sources/Dictate/AppController.swift) |
-| Records from the microphone | [`Recorder.swift`](Sources/Dictate/Recorder.swift) |
-| Turns speech into text with Parakeet | [`Transcriber.swift`](Sources/Dictate/Transcriber.swift) |
-| Finds the text box, adds spacing and pastes | [`TextInsertion.swift`](Sources/Dictate/TextInsertion.swift) |
-| Draws the waveform pill and notices | [`Overlay.swift`](Sources/Dictate/Overlay.swift) |
-| Shows the status in the menu bar | [`MenuBarIndicator.swift`](Sources/Dictate/MenuBarIndicator.swift) |
-| Settings window and preferences | [`Settings.swift`](Sources/Dictate/Settings.swift) |
+| Handles the Fn key and delivers the text | [`AppController.swift`](Sources/SpeakFn/AppController.swift) |
+| Records from the microphone | [`Recorder.swift`](Sources/SpeakFn/Recorder.swift) |
+| Turns speech into text with Parakeet | [`Transcriber.swift`](Sources/SpeakFn/Transcriber.swift) |
+| Finds the text box, adds spacing and pastes | [`TextInsertion.swift`](Sources/SpeakFn/TextInsertion.swift) |
+| Draws the waveform pill and notices | [`Overlay.swift`](Sources/SpeakFn/Overlay.swift) |
+| Shows the status in the menu bar | [`MenuBarIndicator.swift`](Sources/SpeakFn/MenuBarIndicator.swift) |
+| Settings window and preferences | [`Settings.swift`](Sources/SpeakFn/Settings.swift) |
 
-You can also run `Dictate --transcribe recording.wav` to print a transcript of an audio file, which is handy for
+You can also run `SpeakFn --transcribe recording.wav` to print a transcript of an audio file, which is handy for
 testing the model. The icon is drawn by [`scripts/make-icon.swift`](scripts/make-icon.swift).
 
 ## Good to know
@@ -137,4 +138,4 @@ testing the model. The icon is drawn by [`scripts/make-icon.swift`](scripts/make
 
 ## License
 
-Dictate is released under the [MIT License](LICENSE).
+SpeakFn is released under the [MIT License](LICENSE).

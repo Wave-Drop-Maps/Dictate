@@ -1,5 +1,5 @@
 import AppKit
-// Draws the Dictate icon: a deep indigo→violet rounded square with a white voice waveform and a red "live" dot.
+// Draws the SpeakFn icon: a deep indigo→violet rounded square with a white voice waveform and a red "live" dot.
 let size: CGFloat = 1024
 let img = NSImage(size: NSSize(width: size, height: size))
 img.lockFocus()

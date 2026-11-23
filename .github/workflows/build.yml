@@ -19,14 +19,14 @@ jobs:
           restore-keys: spm-${{ runner.os }}-
 
       - name: Build
-        run: swift build -c release --product Dictate
+        run: swift build -c release --product SpeakFn
 
       - name: Package app bundle
         run: |
-          APP=build/Dictate.app
+          APP=build/SpeakFn.app
           mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-          cp .build/release/Dictate "$APP/Contents/MacOS/"
+          cp .build/release/SpeakFn "$APP/Contents/MacOS/"
           cp Info.plist "$APP/Contents/"
-          cp icon/Dictate.icns sounds/*.wav "$APP/Contents/Resources/"
+          cp icon/SpeakFn.icns sounds/*.wav "$APP/Contents/Resources/"
           codesign --force --deep --sign - "$APP"
           codesign --verify --deep --strict "$APP"

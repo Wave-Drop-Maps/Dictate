@@ -50,8 +50,10 @@ private let cueSounds: [Cue: NSSound] = {
 }()
 
 func play(_ cue: Cue) {
-    guard UserDefaults.standard.bool(forKey: "sounds"), let sound = cueSounds[cue] else { return }
+    let defaults = UserDefaults.standard
+    guard defaults.bool(forKey: "sounds"), let sound = cueSounds[cue] else { return }
     sound.stop()  // restart cleanly if it's still playing
+    sound.volume = Float(defaults.object(forKey: "soundVolume") as? Double ?? 0.5)
     sound.play()
 }
 

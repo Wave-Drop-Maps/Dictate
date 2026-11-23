@@ -24,6 +24,7 @@ final class Prefs: ObservableObject {
 
     @Published var autoPaste: Bool { didSet { defaults.set(autoPaste, forKey: "autoPaste") } }
     @Published var sounds: Bool { didSet { defaults.set(sounds, forKey: "sounds") } }
+    @Published var soundVolume: Double { didSet { defaults.set(soundVolume, forKey: "soundVolume") } }
     @Published var showPill: Bool { didSet { defaults.set(showPill, forKey: "showPill") } }
     @Published var diagnostics: Bool { didSet { defaults.set(diagnostics, forKey: "diagnostics") } }
     @Published var showInDock: Bool {
@@ -44,9 +45,10 @@ final class Prefs: ObservableObject {
     @Published var history: [HistoryItem] = []
 
     private init() {
-        defaults.register(defaults: ["autoPaste": true, "sounds": true, "showPill": true, "diagnostics": false, "showInDock": true])
+        defaults.register(defaults: ["autoPaste": true, "sounds": true, "showPill": true, "diagnostics": false, "showInDock": true, "soundVolume": 0.5])
         autoPaste = defaults.bool(forKey: "autoPaste")
         sounds = defaults.bool(forKey: "sounds")
+        soundVolume = defaults.double(forKey: "soundVolume")
         showPill = defaults.bool(forKey: "showPill")
         diagnostics = defaults.bool(forKey: "diagnostics")
         showInDock = defaults.bool(forKey: "showInDock")
@@ -221,6 +223,16 @@ struct SettingsView: View {
             Toggle("Show the recording pill", isOn: $prefs.showPill)
             Toggle("Show Dictate in the Dock (off = menu bar only)", isOn: $prefs.showInDock)
             Toggle("Play sounds", isOn: $prefs.sounds)
+            if prefs.sounds {
+                HStack(spacing: 10) {
+                    Text("Sound volume")
+                    Image(systemName: "speaker.fill").foregroundStyle(.secondary)
+                    Slider(value: $prefs.soundVolume, in: 0.05...1) { editing in
+                        if !editing { play(.start) }  // preview the new level when you let go
+                    }
+                    Image(systemName: "speaker.wave.3.fill").foregroundStyle(.secondary)
+                }
+            }
             Toggle("Diagnostic log (key presses only, never your words)", isOn: $prefs.diagnostics)
         }
     }

@@ -132,7 +132,7 @@ testing the model. The icon is drawn by [`scripts/make-icon.swift`](scripts/make
 - Speech model: [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (CC-BY-4.0),
   converted to Core ML by [FluidInference](https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml).
 - On-device inference: [FluidAudio](https://github.com/FluidInference/FluidAudio) (Apache-2.0).
-- Sound: "drop_003" from [Kenney's Interface Sounds](https://kenney.nl/assets/interface-sounds) (CC0).
+- Sound: a softened "drop_003" from [Kenney's Interface Sounds](https://kenney.nl/assets/interface-sounds) (CC0).
 - The icon was made for this project.
 
 ## License

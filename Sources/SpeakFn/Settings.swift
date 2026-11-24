@@ -23,6 +23,8 @@ final class Prefs: ObservableObject {
     private let defaults = UserDefaults.standard
 
     @Published var autoPaste: Bool { didSet { defaults.set(autoPaste, forKey: "autoPaste") } }
+    @Published var duckAudio: Bool { didSet { defaults.set(duckAudio, forKey: "duckAudio") } }
+    @Published var duckLevel: Double { didSet { defaults.set(duckLevel, forKey: "duckLevel") } }
     @Published var sounds: Bool { didSet { defaults.set(sounds, forKey: "sounds") } }
     @Published var soundVolume: Double { didSet { defaults.set(soundVolume, forKey: "soundVolume") } }
     @Published var showPill: Bool { didSet { defaults.set(showPill, forKey: "showPill") } }
@@ -45,8 +47,19 @@ final class Prefs: ObservableObject {
     @Published var history: [HistoryItem] = []
 
     private init() {
-        defaults.register(defaults: ["autoPaste": true, "sounds": true, "showPill": true, "diagnostics": false, "showInDock": true, "soundVolume": 0.5])
+        defaults.register(defaults: [
+            "autoPaste": true,
+            "duckAudio": true,
+            "duckLevel": 0.15,
+            "sounds": true,
+            "showPill": true,
+            "diagnostics": false,
+            "showInDock": false,
+            "soundVolume": 0.5,
+        ])
         autoPaste = defaults.bool(forKey: "autoPaste")
+        duckAudio = defaults.bool(forKey: "duckAudio")
+        duckLevel = defaults.double(forKey: "duckLevel")
         sounds = defaults.bool(forKey: "sounds")
         soundVolume = defaults.double(forKey: "soundVolume")
         showPill = defaults.bool(forKey: "showPill")
@@ -144,7 +157,7 @@ struct SettingsView: View {
             .formStyle(.grouped)
             footer
         }
-        .frame(width: 540, height: 720)
+        .frame(width: 540, height: 750)
         .onReceive(timer) { _ in prefs.refreshStatus() }
     }
 
@@ -207,6 +220,10 @@ struct SettingsView: View {
         }
     }
 
+    private var duckLevelLabel: String {
+        prefs.duckLevel <= 0.02 ? "Mute" : "\(Int(round(prefs.duckLevel * 100)))%"
+    }
+
     private var optionsSection: some View {
         Section("Options") {
             Toggle(
@@ -220,7 +237,20 @@ struct SettingsView: View {
                 }
             }
             Toggle("Type the text for me (off = copy to clipboard only)", isOn: $prefs.autoPaste)
-            Toggle("Show the recording pill", isOn: $prefs.showPill)
+            Toggle("Quiet background music while speaking", isOn: $prefs.duckAudio)
+            if prefs.duckAudio {
+                HStack(spacing: 10) {
+                    Text("Music level")
+                    Image(systemName: "speaker.slash.fill").foregroundStyle(.secondary)
+                    Slider(value: $prefs.duckLevel, in: 0.0...0.50, step: 0.05)
+                    Image(systemName: "speaker.wave.1.fill").foregroundStyle(.secondary)
+                    Text(duckLevelLabel)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: 38, alignment: .trailing)
+                }
+            }
+            Toggle("Show the recording pill (drag it if it's in the way)", isOn: $prefs.showPill)
             Toggle("Show SpeakFn in the Dock (off = menu bar only)", isOn: $prefs.showInDock)
             Toggle("Play sounds", isOn: $prefs.sounds)
             if prefs.sounds {
@@ -291,10 +321,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     var onDownloadModel: () -> Void = {}
 
+    var isVisible: Bool { window?.isVisible == true }
+
     func show() {
         if window == nil {
             let w = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 540, height: 720),
+                contentRect: NSRect(x: 0, y: 0, width: 540, height: 750),
                 styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
             w.title = "SpeakFn"
             w.isReleasedWhenClosed = false
@@ -310,8 +342,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         window?.makeKeyAndOrderFront(nil)
     }
 
-    /// Closing the window keeps SpeakFn running (Fn still works). Only Quit stops it.
+    /// Closing the window keeps SpeakFn running (Fn still works) and hands focus back to your previous app.
     func windowWillClose(_ notification: Notification) {
         Prefs.shared.applyDockPolicy(windowOpen: false)
+        TextInserter.shared.restoreExternalFocusIfNeeded()
     }
 }

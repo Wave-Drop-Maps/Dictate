@@ -1,6 +1,7 @@
-// The floating pill (waveform while recording) and toast messages (errors, "copied", etc.).
+// The floating pill (GPU-accelerated waveform while recording) and toast messages.
 
 import AppKit
+import QuartzCore
 import SwiftUI
 
 // MARK: - Recording pill
@@ -9,144 +10,301 @@ enum OverlayState: Equatable { case hidden, recording, handsFree, transcribing }
 
 /// Smoothed loudness → bar heights, shared by the pill and the menu bar.
 final class LevelMeter {
-    private(set) var history = [CGFloat](repeating: 0, count: 12)
+    private let lock = NSLock()
+    private var envelope: CGFloat = 0
+    private var history = [CGFloat](repeating: 0, count: 16)
 
-    func push(_ level: CGFloat) {
+    func push(_ raw: CGFloat) {
+        lock.lock()
+        // Fast attack so syllables pop immediately; smooth release so bars don't jitter between phonemes.
+        if raw > envelope {
+            envelope = envelope * 0.35 + raw * 0.65
+        } else {
+            envelope = envelope * 0.78 + raw * 0.22
+        }
         history.removeFirst()
-        history.append(level)
+        history.append(envelope)
+        lock.unlock()
     }
 
-    func reset() { history = history.map { _ in 0 } }
+    func reset() {
+        lock.lock()
+        envelope = 0
+        for i in history.indices { history[i] = 0 }
+        lock.unlock()
+    }
 
-    /// `count` bars, loudest in the middle, gently varying over time.
+    /// `count` bars, loudest in the middle, smoothly interpolated across recent loudness history.
     func targets(count: Int, phase: CGFloat) -> [CGFloat] {
+        lock.lock()
+        let snap = history
+        lock.unlock()
+
         let mid = CGFloat(count - 1) / 2
+        let lastIdx = CGFloat(snap.count - 1)
         return (0..<count).map { i in
-            let distance = abs(CGFloat(i) - mid) / max(mid, 1)
-            let level = history[history.count - 1 - min(Int(abs(CGFloat(i) - mid)), history.count - 1)]
-            let shape = 1 - 0.55 * distance
-            let wobble = 0.85 + 0.15 * sin(phase * 3 + CGFloat(i) * 1.7)
-            return max(0.12, min(1, level * 1.3 * shape * wobble))
+            let dist = abs(CGFloat(i) - mid) / max(mid, 1)
+            // Fractional lookup into history for smooth ripple outward from center.
+            let pos = max(0, lastIdx - dist * 4.0)
+            let lo = Int(floor(pos))
+            let hi = min(snap.count - 1, lo + 1)
+            let frac = pos - CGFloat(lo)
+            let level = snap[lo] * (1 - frac) + snap[hi] * frac
+            let shape = 1 - 0.50 * dist
+            let wobble = 0.88 + 0.12 * sin(phase * 2.6 + CGFloat(i) * 1.5)
+            return max(0.13, min(1, level * 1.35 * shape * wobble))
         }
     }
 }
 
-/// Compact pill: a status dot and a smooth waveform while recording, three dots while transcribing.
+/// GPU-backed pill view using Core Animation sublayers so animations never redraw bitmaps or stall WindowServer.
 final class PillView: NSView {
-    var state: OverlayState = .hidden
+    var state: OverlayState = .hidden {
+        didSet { updateLayerVisibility() }
+    }
     let meter: LevelMeter
-    private var bars = [CGFloat](repeating: 0.12, count: 7)
-    private(set) var phase: CGFloat = 0
+
+    private let bgLayer = CALayer()
+    private let dotLayer = CALayer()
+    private var barLayers: [CALayer] = []
+    private var dotSpinLayers: [CALayer] = []
+    private var bars = [CGFloat](repeating: 0.13, count: 7)
+    private var phase: CGFloat = 0
 
     init(meter: LevelMeter) {
         self.meter = meter
-        super.init(frame: .zero)
+        super.init(frame: NSRect(x: 0, y: 0, width: 74, height: 24))
+        wantsLayer = true
+        layerContentsRedrawPolicy = .never
+        setupLayers()
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    func tick() {
-        phase += 0.1
-        let targets = meter.targets(count: bars.count, phase: phase)
-        for i in bars.indices { bars[i] += (targets[i] - bars[i]) * 0.35 }  // ease toward the target
-        needsDisplay = true
+    // Allow dragging the pill out of the way on first click without activating SpeakFn or stealing focus.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override var mouseDownCanMoveWindow: Bool { true }
+
+    private func setupLayers() {
+        guard let root = layer else { return }
+        root.masksToBounds = false
+
+        bgLayer.backgroundColor = NSColor(white: 0.10, alpha: 0.92).cgColor
+        bgLayer.borderColor = NSColor(white: 1.0, alpha: 0.14).cgColor
+        bgLayer.borderWidth = 1
+        bgLayer.cornerCurve = .continuous
+        root.addSublayer(bgLayer)
+
+        dotLayer.bounds = CGRect(x: 0, y: 0, width: 6, height: 6)
+        dotLayer.cornerRadius = 3
+        root.addSublayer(dotLayer)
+
+        for _ in 0..<7 {
+            let bar = CALayer()
+            bar.backgroundColor = NSColor.white.cgColor
+            bar.cornerRadius = 1.5
+            root.addSublayer(bar)
+            barLayers.append(bar)
+        }
+
+        for _ in 0..<3 {
+            let dot = CALayer()
+            dot.bounds = CGRect(x: 0, y: 0, width: 5, height: 5)
+            dot.cornerRadius = 2.5
+            dot.backgroundColor = NSColor.white.cgColor
+            root.addSublayer(dot)
+            dotSpinLayers.append(dot)
+        }
     }
 
-    override func draw(_ dirtyRect: NSRect) {
-        let b = bounds
-        let pill = NSBezierPath(roundedRect: b.insetBy(dx: 0.5, dy: 0.5), xRadius: b.height / 2, yRadius: b.height / 2)
-        NSColor(white: 0.1, alpha: 0.9).setFill()
-        pill.fill()
-        NSColor(white: 1, alpha: 0.12).setStroke()
-        pill.lineWidth = 1
-        pill.stroke()
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let b = bounds.insetBy(dx: 0.5, dy: 0.5)
+        bgLayer.frame = b
+        bgLayer.cornerRadius = b.height / 2
+        layoutSublayers(in: bounds)
+        CATransaction.commit()
+    }
 
+    private func updateLayerVisibility() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let showWave = state == .recording || state == .handsFree
+        let showDots = state == .transcribing
+        dotLayer.isHidden = !showWave
+        for bar in barLayers { bar.isHidden = !showWave }
+        for dot in dotSpinLayers { dot.isHidden = !showDots }
+        layoutSublayers(in: bounds)
+        CATransaction.commit()
+    }
+
+    func tick() {
+        guard state != .hidden else { return }
+        phase += 0.065
+        let targets = meter.targets(count: bars.count, phase: phase)
+        for i in bars.indices {
+            bars[i] += (targets[i] - bars[i]) * 0.28
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layoutSublayers(in: bounds)
+        CATransaction.commit()
+    }
+
+    private func layoutSublayers(in b: NSRect) {
         let midY = b.midY
         switch state {
         case .hidden:
-            return
+            break
         case .recording, .handsFree:
-            let dotColor = state == .handsFree ? NSColor.systemOrange : NSColor.systemRed
-            dotColor.withAlphaComponent(0.75 + 0.25 * sin(phase * 2)).setFill()
-            NSBezierPath(ovalIn: NSRect(x: 11, y: midY - 3, width: 6, height: 6)).fill()
+            let baseColor = state == .handsFree ? NSColor.systemOrange : NSColor.systemRed
+            let alpha = 0.78 + 0.22 * sin(phase * 2.2)
+            dotLayer.backgroundColor = baseColor.withAlphaComponent(alpha).cgColor
+            dotLayer.position = CGPoint(x: 14, y: midY)
 
             let barWidth: CGFloat = 3, gap: CGFloat = 3
             var x: CGFloat = 25
-            let maxHeight = b.height - 12
-            NSColor.white.setFill()
-            for level in bars {
+            let maxHeight = max(4, b.height - 12)
+            for (i, level) in bars.enumerated() {
                 let h = max(3, level * maxHeight)
-                NSBezierPath(
-                    roundedRect: NSRect(x: x, y: midY - h / 2, width: barWidth, height: h), xRadius: 1.5,
-                    yRadius: 1.5
-                ).fill()
+                barLayers[i].frame = CGRect(x: x, y: midY - h / 2, width: barWidth, height: h)
                 x += barWidth + gap
             }
         case .transcribing:
-            for i in 0..<3 {
-                let a = 0.3 + 0.7 * max(0, sin(phase * 3 - CGFloat(i) * 0.9))
-                NSColor.white.withAlphaComponent(a).setFill()
-                NSBezierPath(ovalIn: NSRect(x: 13 + CGFloat(i) * 9, y: midY - 2.5, width: 5, height: 5)).fill()
+            for (i, dot) in dotSpinLayers.enumerated() {
+                let a = 0.3 + 0.7 * max(0, sin(phase * 3.2 - CGFloat(i) * 0.9))
+                dot.opacity = Float(a)
+                dot.position = CGPoint(x: 15.5 + CGFloat(i) * 9.5, y: midY)
             }
         }
     }
 }
 
-/// Bottom-centre of the screen the mouse is on.
-private func bottomCentre(width: CGFloat, height: CGFloat, lift: CGFloat) -> NSRect {
+/// Active screen where the user is currently working (screen containing the mouse cursor, or main screen).
+private func activeScreen() -> NSScreen? {
     let mouse = NSEvent.mouseLocation
-    let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
-    let vf = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-    return NSRect(x: vf.midX - width / 2, y: vf.minY + lift, width: width, height: height)
+    return NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main ?? NSScreen.screens.first
 }
 
-private func makeFloatingPanel(clickable: Bool) -> NSPanel {
+/// Bottom-centre of the given screen.
+private func bottomCentre(on screen: NSScreen?, width: CGFloat, height: CGFloat, lift: CGFloat) -> NSRect {
+    let vf = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+    return NSRect(x: round(vf.midX - width / 2), y: round(vf.minY + lift), width: width, height: height)
+}
+
+private func makeFloatingPanel(clickable: Bool, movable: Bool = false) -> NSPanel {
     let panel = NSPanel(
         contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
     panel.isOpaque = false
     panel.backgroundColor = .clear
     panel.hasShadow = true
-    panel.level = .statusBar
-    panel.ignoresMouseEvents = !clickable
+    // .popUpMenu floats reliably over full-screen Spaces and Stage Manager windows without fighting the menu bar.
+    panel.level = .popUpMenu
+    panel.ignoresMouseEvents = !clickable && !movable
+    panel.isMovableByWindowBackground = movable
     panel.isFloatingPanel = true
     panel.hidesOnDeactivate = false
     panel.becomesKeyOnlyIfNeeded = true
-    panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+    // Omit .stationary so 3-finger Space swipes and full-screen window transitions carry the pill smoothly.
+    panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
     return panel
 }
 
-/// The recording pill. Never takes focus or clicks.
-final class Overlay {
-    private let panel = makeFloatingPanel(clickable: false)
+/// The recording pill. Never steals focus; follows you across screens & Spaces, and can be dragged if in the way.
+final class Overlay: NSObject, NSWindowDelegate {
+    private let panel = makeFloatingPanel(clickable: false, movable: true)
     private let view: PillView
     private var timer: Timer?
+    private var currentScreenFrame: NSRect = .zero
+    private var userDraggedOffset: NSPoint?  // relative to visibleFrame bottom-center if user dragged the pill
+    private var isProgrammaticFrameChange = false
 
     init(meter: LevelMeter) {
         view = PillView(meter: meter)
+        super.init()
         panel.contentView = view
+        panel.delegate = self
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        guard !isProgrammaticFrameChange, let screen = panel.screen ?? activeScreen() else { return }
+        let vf = screen.visibleFrame
+        userDraggedOffset = NSPoint(x: panel.frame.midX - vf.midX, y: panel.frame.minY - vf.minY)
     }
 
     func show(_ state: OverlayState) {
         if state != .hidden && !UserDefaults.standard.bool(forKey: "showPill") {
+            stopTimers()
             panel.orderOut(nil)
             return
         }
+        let wasHidden = view.state == .hidden
         view.state = state
         guard state != .hidden else {
-            timer?.invalidate()
-            timer = nil
+            stopTimers()
             panel.orderOut(nil)
             return
         }
+
         let width: CGFloat = state == .transcribing ? 50 : 74
-        panel.setFrame(bottomCentre(width: width, height: 24, lift: 18), display: true)
-        panel.orderFrontRegardless()
-        view.needsDisplay = true
+        placePanel(width: width, force: wasHidden || panel.frame.width != width)
+        if !panel.isVisible {
+            panel.orderFrontRegardless()
+        }
+
         if timer == nil {
-            let t = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in self?.view.tick() }
-            RunLoop.main.add(t, forMode: .common)  // keeps animating while menus are open
+            // 60 fps Core Animation tick; also checks ~4x/sec if the user moved to another display.
+            var frameCount = 0
+            let t = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                self.view.tick()
+                frameCount &+= 1
+                if frameCount % 15 == 0 {
+                    self.followActiveScreenIfNeeded()
+                }
+            }
+            RunLoop.main.add(t, forMode: .common)
             timer = t
         }
+    }
+
+    private func placePanel(width: CGFloat, force: Bool) {
+        let screen = activeScreen()
+        let vf = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        guard force || vf != currentScreenFrame else { return }
+        currentScreenFrame = vf
+
+        let target: NSRect
+        if let offset = userDraggedOffset {
+            let rawX = vf.midX + offset.x - width / 2
+            let rawY = vf.minY + offset.y
+            let clampedX = min(max(vf.minX + 8, rawX), vf.maxX - width - 8)
+            let clampedY = min(max(vf.minY + 6, rawY), vf.maxY - 24 - 8)
+            target = NSRect(x: round(clampedX), y: round(clampedY), width: width, height: 24)
+        } else {
+            target = bottomCentre(on: screen, width: width, height: 24, lift: 18)
+        }
+
+        let sizeChanged = panel.frame.size != target.size
+        isProgrammaticFrameChange = true
+        panel.setFrame(target, display: true)
+        isProgrammaticFrameChange = false
+        if sizeChanged {
+            panel.invalidateShadow()
+        }
+    }
+
+    private func followActiveScreenIfNeeded() {
+        guard view.state != .hidden else { return }
+        let width: CGFloat = view.state == .transcribing ? 50 : 74
+        placePanel(width: width, force: false)
+    }
+
+    private func stopTimers() {
+        timer?.invalidate()
+        timer = nil
     }
 }
 
@@ -217,7 +375,7 @@ private struct ToastView: View {
 
 /// Small floating message near the bottom of the screen. Clickable, but never steals focus.
 final class Toaster {
-    private let panel = makeFloatingPanel(clickable: true)
+    private let panel = makeFloatingPanel(clickable: true, movable: false)
     private var hideWork: DispatchWorkItem?
     private var generation = 0  // so a fading-out toast can't hide the next one
 
@@ -227,7 +385,7 @@ final class Toaster {
         let host = ClickThroughHostingView(rootView: view)
         let size = host.fittingSize
         panel.contentView = host
-        panel.setFrame(bottomCentre(width: size.width, height: size.height, lift: 14), display: true)
+        panel.setFrame(bottomCentre(on: activeScreen(), width: size.width, height: size.height, lift: 14), display: true)
         panel.alphaValue = 0
         panel.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { ctx in

@@ -8,8 +8,10 @@ final class MenuBarIndicator {
     private var state: OverlayState = .hidden
     private var started = Date()
     private var timer: Timer?
+    private var clockTimer: Timer?
     private var bars = [CGFloat](repeating: 0.15, count: 5)
     private var phase: CGFloat = 0
+    private var lastRenderedTitle = ""
 
     init(item: NSStatusItem, meter: LevelMeter) {
         self.item = item
@@ -22,8 +24,7 @@ final class MenuBarIndicator {
         state = newState
         switch newState {
         case .hidden:
-            timer?.invalidate()
-            timer = nil
+            stopTimers()
             showIdle()
             return
         case .recording, .handsFree:
@@ -31,12 +32,29 @@ final class MenuBarIndicator {
         case .transcribing:
             break
         }
-        render()
+        render(forceTitle: true)
         if timer == nil {
-            let t = Timer(timeInterval: 1.0 / 15, repeats: true) { [weak self] _ in self?.render() }
-            RunLoop.main.add(t, forMode: .common)
+            // Run bar animation in .default mode so dragging windows (.eventTracking) never contends with NSStatusBar.
+            let t = Timer(timeInterval: 1.0 / 15.0, repeats: true) { [weak self] _ in
+                self?.render(forceTitle: false)
+            }
+            RunLoop.main.add(t, forMode: .default)
             timer = t
+
+            // Update the elapsed seconds text once per second even during menus/tracking.
+            let ct = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+                self?.updateTitleIfNeeded(force: false)
+            }
+            RunLoop.main.add(ct, forMode: .common)
+            clockTimer = ct
         }
+    }
+
+    private func stopTimers() {
+        timer?.invalidate()
+        timer = nil
+        clockTimer?.invalidate()
+        clockTimer = nil
     }
 
     private func showIdle() {
@@ -44,33 +62,28 @@ final class MenuBarIndicator {
         let image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "SpeakFn")
         image?.isTemplate = true
         button.image = image
+        lastRenderedTitle = ""
         button.attributedTitle = NSAttributedString(string: "")
         button.imagePosition = .imageOnly
     }
 
-    private func render() {
-        guard let button = item.button else { return }
-        phase += 0.2
-        let title: String
-        let color: NSColor
+    private func currentTitleAndColor() -> (String, NSColor)? {
         switch state {
         case .recording:
-            color = .systemRed
-            title = "Listening \(elapsed)"
+            return ("Listening \(elapsed)", .systemRed)
         case .handsFree:
-            color = .systemOrange
-            title = "Hands-free \(elapsed) · Fn to finish"
+            return ("Hands-free \(elapsed) · Fn to finish", .systemOrange)
         case .transcribing:
-            color = .labelColor
-            title = "Transcribing…"
+            return ("Transcribing…", .labelColor)
         case .hidden:
-            return
+            return nil
         }
-        let targets = state == .transcribing
-            ? (0..<bars.count).map { i in 0.25 + 0.35 * max(0, sin(phase - CGFloat(i) * 0.7)) }
-            : meter.targets(count: bars.count, phase: phase)
-        for i in bars.indices { bars[i] += (targets[i] - bars[i]) * 0.5 }
-        button.image = barsImage(color: color)
+    }
+
+    private func updateTitleIfNeeded(force: Bool) {
+        guard let button = item.button, let (title, _) = currentTitleAndColor() else { return }
+        guard force || title != lastRenderedTitle else { return }
+        lastRenderedTitle = title
         button.imagePosition = .imageLeading
         button.attributedTitle = NSAttributedString(
             string: " " + title,
@@ -78,6 +91,17 @@ final class MenuBarIndicator {
                 .font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium),
                 .baselineOffset: 0.5,
             ])
+    }
+
+    private func render(forceTitle: Bool) {
+        guard let button = item.button, let (_, color) = currentTitleAndColor() else { return }
+        phase += 0.2
+        let targets = state == .transcribing
+            ? (0..<bars.count).map { i in 0.25 + 0.35 * max(0, sin(phase - CGFloat(i) * 0.7)) }
+            : meter.targets(count: bars.count, phase: phase)
+        for i in bars.indices { bars[i] += (targets[i] - bars[i]) * 0.45 }
+        button.image = barsImage(color: color)
+        updateTitleIfNeeded(force: forceTitle)
     }
 
     private var elapsed: String {

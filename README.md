@@ -9,6 +9,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Wave-Drop-Maps/SpeakFn/releases/latest"><img src="https://img.shields.io/github/v/release/Wave-Drop-Maps/SpeakFn?label=version&color=0969da" alt="Version 2.0"></a>
   <a href="https://github.com/Wave-Drop-Maps/SpeakFn/actions/workflows/build.yml"><img src="https://github.com/Wave-Drop-Maps/SpeakFn/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple" alt="macOS 14 or later">
   <img src="https://img.shields.io/badge/Apple%20Silicon-M1%2B-black" alt="Apple Silicon">
@@ -48,15 +49,18 @@ which makes it fast and accurate, and it keeps working with your Wi-Fi switched 
 
 - **Hold Fn to talk.** Let go and the text is typed into whatever app you're using.
 - **Double-tap Fn for hands-free.** Talk for as long as you like, then press Fn once to finish. Press Esc to cancel.
+- **Quiets background music while you talk.** Music smoothly dips while you're speaking so it never competes with
+  your voice, then comes right back when you stop.
 - **Every result is copied too.** If the text doesn't land where you expected, just press ⌘V.
 - **It tells you when there's nowhere to type.** If no text box is selected, you'll see a small notice with a
-  Copy button rather than your words quietly disappearing. This works in regular apps and in your browser.
+  Copy button rather than your words quietly disappearing. This works in regular apps, across multiple windows,
+  and in your browser.
 - **Smart spacing.** SpeakFn adds a space when you start talking straight after a word.
-- **You can always tell it's listening.** A small waveform appears at the bottom of the screen and the menu bar
-  shows a timer while you talk.
-- **It stays out of your way.** Your usual Fn shortcuts, like Fn with an arrow key, still work, and accidental
-  taps are ignored.
-- **It's lightweight.** It's about 1,600 lines of Swift, and when idle it uses no CPU and around 30 MB of memory.
+- **You can always tell it's listening.** A small waveform appears at the bottom of your active screen — drag it
+  anywhere if it's in the way — and the menu bar shows a timer while you talk.
+- **It stays out of your way.** Your usual Fn shortcuts, like Fn with an arrow key or macOS window tiling, keep
+  working even in hands-free mode, and accidental taps are ignored.
+- **It's lightweight.** It's a small native Swift app, and when idle it uses no CPU and around 20 MB of memory.
 
 <p align="center">
   <img src="docs/settings.png" width="460" alt="SpeakFn's settings window, showing setup status, instructions and options">
@@ -112,6 +116,7 @@ The code is split into a handful of small files:
 |---|---|
 | Handles the Fn key and delivers the text | [`AppController.swift`](Sources/SpeakFn/AppController.swift) |
 | Records from the microphone | [`Recorder.swift`](Sources/SpeakFn/Recorder.swift) |
+| Smoothly lowers background music while you speak | [`AudioDucker.swift`](Sources/SpeakFn/AudioDucker.swift) |
 | Turns speech into text with Parakeet | [`Transcriber.swift`](Sources/SpeakFn/Transcriber.swift) |
 | Finds the text box, adds spacing and pastes | [`TextInsertion.swift`](Sources/SpeakFn/TextInsertion.swift) |
 | Draws the waveform pill and notices | [`Overlay.swift`](Sources/SpeakFn/Overlay.swift) |

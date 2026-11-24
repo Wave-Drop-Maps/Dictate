@@ -53,7 +53,10 @@ func play(_ cue: Cue) {
     let defaults = UserDefaults.standard
     guard defaults.bool(forKey: "sounds"), let sound = cueSounds[cue] else { return }
     sound.stop()  // restart cleanly if it's still playing
-    sound.volume = Float(defaults.object(forKey: "soundVolume") as? Double ?? 0.5)
+    let base = Float(defaults.object(forKey: "soundVolume") as? Double ?? 0.5)
+    // Compensate slightly if background audio is currently ducked so cues stay audible.
+    let effective = AudioDucker.shared.isDucked ? min(1.0, base * 2.2) : base
+    sound.volume = effective
     sound.play()
 }
 

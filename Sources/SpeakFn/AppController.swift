@@ -1,8 +1,8 @@
-// App lifecycle, the Fn key state machine, and delivering text.
+// App lifecycle, the Fn key state machine, audio ducking, and delivering text.
 //
 //  • Hold Fn            → records while held, transcribes on release, types it.
-//  • Double-tap Fn      → hands-free until Fn is pressed again (Esc cancels).
-//  • Fn + another key   → ignored (normal Fn shortcuts keep working).
+//  • Double-tap Fn      → hands-free until Fn is tapped again (Esc cancels).
+//  • Fn + another key   → ignored (normal Fn and window-tiling shortcuts keep working, even in hands-free).
 //  • Every transcript is also left on the clipboard.
 
 import AVFoundation
@@ -11,7 +11,13 @@ import ApplicationServices
 import SwiftUI
 
 final class AppController: NSObject, NSApplicationDelegate {
-    enum Mode: Equatable { case idle, holding(Date), tapPending(Date), handsFree, transcribing }
+    enum Mode: Equatable {
+        case idle
+        case holding(TimeInterval)
+        case tapPending(UUID)
+        case handsFree(finishingOnUp: Bool)
+        case transcribing
+    }
 
     let meter = LevelMeter()
     lazy var overlay = Overlay(meter: meter)
@@ -19,7 +25,7 @@ final class AppController: NSObject, NSApplicationDelegate {
     let toaster = Toaster()
     let settings = SettingsWindowController()
     let transcriber = Transcriber()
-    let audioQueue = DispatchQueue(label: "dictate.audio")  // mic start/stop never blocks key handling
+    let audioQueue = DispatchQueue(label: "dictate.audio", qos: .userInteractive)
     lazy var recorder = Recorder(queue: audioQueue)
 
     var statusItem: NSStatusItem!
@@ -29,15 +35,18 @@ final class AppController: NSObject, NSApplicationDelegate {
     var fnUsedAsModifier = false
     var ignoreNextFnUp = false
     var eventTap: CFMachPort?
+    var mouseModifierMonitor: Any?
     var lastTranscript = ""
     var launchedAtLogin = false
-    var recordingStarted = Date()
     var safetyStop: DispatchWorkItem?
+    var lastMeterPush: CFAbsoluteTime = 0
 
-    let tapMaxDuration: TimeInterval = 0.30  // a press shorter than this is a "tap"
-    let doubleTapWindow: TimeInterval = 0.45  // the second tap must land within this
+    let tapMaxDuration: TimeInterval = 0.38   // hardware press duration under this counts as a tap
+    let doubleTapWindow: TimeInterval = 0.50  // second tap must land within this window
     let maxRecording: TimeInterval = 10 * 60  // hands-free safety limit
-    let minSpeechSamples = 4_000  // under 0.25 s of audio = accidental press, ignore quietly
+    let minSpeechSamples = 4_000              // under 0.25 s of audio = accidental press, ignore quietly
+
+    private static let nonFnModifiers: CGEventFlags = [.maskCommand, .maskControl, .maskAlternate, .maskShift]
 
     var prefs: Prefs { Prefs.shared }
 
@@ -51,7 +60,7 @@ final class AppController: NSObject, NSApplicationDelegate {
     // MARK: Launch
 
     func applicationWillFinishLaunching(_ notification: Notification) {
-        Prefs.shared.applyDockPolicy()  // load saved preferences; Dock icon on or off
+        Prefs.shared.applyDockPolicy()
         buildMainMenu()
         if let event = NSAppleEventManager.shared().currentAppleEvent,
             event.eventID == kAEOpenApplication,
@@ -64,8 +73,22 @@ final class AppController: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         debugLog("launch v\(appVersion), trusted=\(AXIsProcessTrusted()), atLogin=\(launchedAtLogin)")
         buildMenu()
+        TextInserter.shared.startMonitoring()
+
+        // Treat Fn + mouse click/drag (e.g. window drag gestures) as a modifier combo, not dictation.
+        mouseModifierMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) {
+            [weak self] _ in
+            guard let self, self.fnIsDown else { return }
+            self.fnUsedAsModifier = true
+        }
+
         recorder.onLevel = { [weak self] level in
-            DispatchQueue.main.async { self?.meter.push(level) }
+            guard let self else { return }
+            let now = CFAbsoluteTimeGetCurrent()
+            // Cap main-thread dispatches to ~45 Hz so audio callbacks stay lightweight.
+            guard now - self.lastMeterPush >= 0.020 else { return }
+            self.lastMeterPush = now
+            DispatchQueue.main.async { self.meter.push(level) }
         }
         settings.onDownloadModel = { [weak self] in self?.downloadModel() }
 
@@ -78,7 +101,12 @@ final class AppController: NSObject, NSApplicationDelegate {
         }
         installEventTap()
         loadModel()
-        if !launchedAtLogin || !AXIsProcessTrusted() { settings.show() }
+        let launchedQuietly = launchedAtLogin || CommandLine.arguments.contains("--background")
+        if !launchedQuietly || !AXIsProcessTrusted() { settings.show() }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        AudioDucker.shared.restoreImmediately()
     }
 
     /// Closing the window never quits — SpeakFn keeps listening for Fn until you choose Quit.
@@ -101,7 +129,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         Task {
             do {
                 try await transcriber.load()
-                _ = try await transcriber.transcribe([Float](repeating: 0, count: 16_000))  // warm up
+                _ = try await transcriber.transcribe([Float](repeating: 0, count: 16_000))  // warm up ANE
                 debugLog("model ready")
                 await MainActor.run {
                     self.prefs.modelState = .ready
@@ -176,7 +204,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         RunLoop.main.add(watchdog, forMode: .common)
     }
 
-    /// Runs on the main thread (the tap is attached to the main run loop).
+    /// Runs on the main thread (the tap is attached to the main run loop). Must stay fast (<1 ms).
     func handle(type: CGEventType, event: CGEvent) {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let eventTap { CGEvent.tapEnable(tap: eventTap, enable: true) }
@@ -184,84 +212,123 @@ final class AppController: NSObject, NSApplicationDelegate {
         }
         if type == .keyDown {
             let key = event.getIntegerValueField(.keyboardEventKeycode)
-            if key == 53, mode == .handsFree {  // Esc cancels hands-free
+            if key == 53, case .handsFree = mode, !fnIsDown {  // Esc cancels hands-free
                 cancel()
             } else if fnIsDown {
-                fnUsedAsModifier = true  // Fn+key shortcut, not dictation
+                fnUsedAsModifier = true  // Fn+key shortcut (arrows, tiling, F-keys), not dictation
             }
             return
         }
         guard type == .flagsChanged else { return }
         let keycode = event.getIntegerValueField(.keyboardEventKeycode)
-        let down = event.flags.contains(.maskSecondaryFn)
+        let otherMods = !event.flags.intersection(Self.nonFnModifiers).isEmpty
+
         // Fn/Globe reports keycode 63 (built-in) or 179 (some external keyboards).
-        guard keycode == 63 || keycode == 179, down != fnIsDown else { return }
+        if keycode != 63 && keycode != 179 {
+            // Pressing Control/Command/Option/Shift while holding Fn (e.g. Fn+Ctrl+Arrow window tiling!)
+            if fnIsDown && otherMods {
+                fnUsedAsModifier = true
+            }
+            return
+        }
+
+        let down = event.flags.contains(.maskSecondaryFn)
+        guard down != fnIsDown else { return }
         fnIsDown = down
-        debugLog("fn \(down ? "down" : "up") mode=\(mode)")
-        down ? fnDown() : fnUp()
+        let ts = Double(event.timestamp) / 1_000_000_000.0
+        debugLog("fn \(down ? "down" : "up") mode=\(mode) otherMods=\(otherMods)")
+        down ? fnDown(at: ts, otherModifiersHeld: otherMods) : fnUp(at: ts)
     }
 
-    func fnDown() {
+    func fnDown(at timestamp: TimeInterval, otherModifiersHeld: Bool) {
+        if otherModifiersHeld {
+            // User already held Ctrl/Cmd/Opt/Shift before pressing Fn (e.g. window tiling shortcut).
+            fnUsedAsModifier = true
+            return
+        }
         switch mode {
         case .idle:
             guard prefs.modelState == .ready else {
                 showNotReadyToast()
                 return
             }
-            startRecording()
+            startRecording(at: timestamp)
         case .tapPending:
-            // Second tap: hands-free starts now and keeps the same recording.
+            // Second tap: hands-free starts now and keeps the same recording running seamlessly.
             ignoreNextFnUp = true
-            mode = .handsFree
+            fnUsedAsModifier = false
+            mode = .handsFree(finishingOnUp: false)
             play(.handsfree)
+            if prefs.duckAudio && !AudioDucker.shared.isDucked {
+                AudioDucker.shared.duck(ratio: prefs.duckLevel)
+            }
             display(.handsFree)
         case .handsFree:
-            ignoreNextFnUp = true
-            finish()
+            // Wait for release so Fn+Ctrl+Arrow window shortcuts can still be used during hands-free!
+            fnUsedAsModifier = false
+            mode = .handsFree(finishingOnUp: true)
         case .holding, .transcribing:
             break
         }
     }
 
-    func fnUp() {
+    func fnUp(at timestamp: TimeInterval) {
         if ignoreNextFnUp {
             ignoreNextFnUp = false
             return
         }
-        guard case .holding(let start) = mode else { return }
-        if fnUsedAsModifier {
-            resetToIdle()
-            return
-        }
-        let now = Date()
-        if now.timeIntervalSince(start) < tapMaxDuration {
-            // Quick tap: keep listening briefly in case a second tap follows.
-            mode = .tapPending(now)
-            DispatchQueue.main.asyncAfter(deadline: .now() + doubleTapWindow) { [weak self] in
-                guard let self, self.mode == .tapPending(now) else { return }
-                self.resetToIdle()  // just a stray tap
+        switch mode {
+        case .holding(let startTs):
+            if fnUsedAsModifier {
+                resetToIdle()
+                return
             }
-        } else {
-            finish()
+            let held = max(0, timestamp - startTs)
+            if held < tapMaxDuration {
+                // Quick tap: keep listening briefly in case a second tap follows for hands-free.
+                let token = UUID()
+                mode = .tapPending(token)
+                DispatchQueue.main.asyncAfter(deadline: .now() + doubleTapWindow) { [weak self] in
+                    guard let self, self.mode == .tapPending(token) else { return }
+                    self.resetToIdle()  // just a stray single tap
+                }
+            } else {
+                finish()
+            }
+
+        case .handsFree(let finishingOnUp):
+            if finishingOnUp && !fnUsedAsModifier {
+                finish()
+            } else {
+                // Fn was used as part of a shortcut (e.g. Fn+Ctrl+Arrow window move); stay in hands-free!
+                mode = .handsFree(finishingOnUp: false)
+            }
+
+        case .idle, .tapPending, .transcribing:
+            break
         }
     }
 
     // MARK: Recording
 
-    func startRecording() {
+    func startRecording(at timestamp: TimeInterval) {
         fnUsedAsModifier = false
-        mode = .holding(Date())
-        recordingStarted = Date()
+        mode = .holding(timestamp)
         meter.reset()
         display(.recording)
-        // Chime only once it's clearly a hold — stray taps and Fn shortcuts stay silent.
+        toaster.hide()
+        TextInserter.shared.beginSession()
+
+        // Chime & duck only once it's clearly dictation (~140 ms) — stray taps and Fn+Arrow shortcuts stay untouched.
         let started = mode
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { [weak self] in
             guard let self, self.mode == started, !self.fnUsedAsModifier else { return }
             play(.start)
+            if self.prefs.duckAudio {
+                AudioDucker.shared.duck(ratio: self.prefs.duckLevel)
+            }
         }
-        toaster.hide()
-        TextInserter.prepare()
+
         audioQueue.async { [weak self] in
             guard let self else { return }
             do {
@@ -274,6 +341,7 @@ final class AppController: NSObject, NSApplicationDelegate {
                 }
             }
         }
+
         let stop = DispatchWorkItem { [weak self] in
             guard let self, self.isRecording else { return }
             self.finish()
@@ -289,6 +357,8 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     func resetToIdle() {
         safetyStop?.cancel()
+        AudioDucker.shared.unduck()
+        TextInserter.shared.endSession()
         audioQueue.async { [weak self] in self?.recorder.stop() }
         mode = .idle
         display(.hidden)
@@ -301,6 +371,7 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     func finish() {
         safetyStop?.cancel()
+        AudioDucker.shared.unduck()
         play(.stop)
         mode = .transcribing
         display(.transcribing)
@@ -309,15 +380,17 @@ final class AppController: NSObject, NSApplicationDelegate {
             let samples = self.recorder.stop()
             debugLog("finish: \(samples.count) samples")
             guard samples.count >= self.minSpeechSamples else {
+                TextInserter.shared.endSession()
                 DispatchQueue.main.async { self.deliver("", accidental: true) }
                 return
             }
             Task {
                 do {
                     let text = try await self.transcriber.transcribe(samples)
-                    await MainActor.run { self.deliver(text, accidental: false) }
+                    await self.deliverAsync(text, accidental: false)
                 } catch {
                     debugLog("transcription error: \(error)")
+                    TextInserter.shared.endSession()
                     await MainActor.run {
                         self.resetToIdle()
                         self.toaster.show(
@@ -332,11 +405,17 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     // MARK: Delivering text
 
+    @MainActor
     func deliver(_ text: String, accidental: Bool) {
-        mode = .idle
-        display(.hidden)
+        Task { await deliverAsync(text, accidental: accidental) }
+    }
+
+    @MainActor
+    func deliverAsync(_ text: String, accidental: Bool) async {
         debugLog("deliver: \(text.count) chars")
         guard !text.isEmpty else {
+            mode = .idle
+            display(.hidden)
             if !accidental {
                 play(.notice)
                 toaster.show(
@@ -346,11 +425,14 @@ final class AppController: NSObject, NSApplicationDelegate {
             }
             return
         }
+
         lastTranscript = text
         prefs.addHistory(text)
         setClipboard(text)  // always on the clipboard as a fallback
 
         guard prefs.autoPaste else {
+            mode = .idle
+            display(.hidden)
             toaster.show(
                 ToastModel(
                     symbol: "doc.on.clipboard.fill", tint: .green, title: "Copied to clipboard",
@@ -358,8 +440,12 @@ final class AppController: NSObject, NSApplicationDelegate {
             return
         }
 
-        let target = TextInserter.currentTarget()
-        switch target {
+        // Resolve target window & text box off the main thread so the UI never freezes.
+        let outcome = await TextInserter.shared.resolveForDelivery(text)
+        mode = .idle
+        display(.hidden)
+
+        switch outcome {
         case .notEditable(let app):
             debugLog("no text box in \(app)")
             play(.notice)
@@ -369,11 +455,8 @@ final class AppController: NSObject, NSApplicationDelegate {
                     message: "Copied to clipboard — press ⌘V to paste",
                     action: ToastAction(title: "Copy") { [weak self] in self?.setClipboard(text) }),
                 seconds: 8)
-        case .editable(let element, _):
-            let spaced = TextInserter.withSmartSpacing(text, for: element)
-            paste(spaced, restoringClipboardTo: text)
-        case .unknown:
-            paste(text, restoringClipboardTo: text)
+        case .paste(let textToPaste):
+            paste(textToPaste, restoringClipboardTo: text)
         }
     }
 
@@ -533,4 +616,3 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     @objc func quit() { NSApp.terminate(nil) }
 }
-
